@@ -10,6 +10,7 @@ This is JavaScript for sending form data using ajax. The script displays a respo
 * [x] Send form data
 * [x] Show return message
 * [x] Redirect
+* [x] Setting class "is-invalid" for input and description error "invalid-feedback"
 
 ## Requirements
 * bootstrap (5.0+)

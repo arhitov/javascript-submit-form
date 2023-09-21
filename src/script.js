@@ -1,8 +1,8 @@
 /**
-* Form Submit - v0.1
-* URL: https://github.com/arhitov/javascript-submit-form
-* Author: Alexander Arhitov clgsru@gmail.com
-*/
+ * Form Submit - v0.2
+ * URL: https://github.com/arhitov/javascript-submit-form
+ * Author: Alexander Arhitov clgsru@gmail.com
+ */
 (function () {
     "use strict";
 
@@ -92,65 +92,79 @@
                         'X-Requested-With': 'XMLHttpRequest'
                     }
                 })
-                .then(async response => {
-                    try {
-                        return {
-                            response: response,
-                            answer: await response.json()
-                        };
-                    } catch (e) {
-                        console.error(e);
-                        throw new Error(`${response.status} ${response.statusText} ${response.url}`);
-                    }
-                })
-                .then(data => {
-                    if (data.response.ok) {
-                        return {
-                            status: data.response.status,
-                            answer: data.answer
-                        };
-                    } else if (data.answer.message) {
-                        throw new Error(`${data.answer.message}`);
-                    } else {
-                        throw new Error(`${data.response.status} ${data.response.statusText} ${data.response.url}`);
-                    }
-                })
-                .then(data => {
-                    if (data.answer.message) {
-                        displaySuccess(data.answer.message);
-                        return data.answer;
-                    } else if (201 === data.status) {
-                        displaySuccess('Successful');
-                        return data.answer;
-                    } else if (202 === data.status) {
-                        displaySuccess('Successful');
-                        return data.answer;
-                    } else {
-                        throw new Error(data ? data : 'Form submission failed and no error message returned from: ' + action);
-                    }
-                })
-                .then(answer => {
-                    if (answer.redirect_to) {
-                        sleep(2000).then(() => {
-                            window.location.href = answer.redirect_to;
-                        });
-                    }
-
-                    const event = thisForm.getAttribute('data-event-success');
-                    if (event) {
-                        document.dispatchEvent(new CustomEvent('submit-form.' + event, {
-                            detail: {
-                                form: thisForm,
-                                data: dataForm,
-                                answer: answer
+                    .then(async response => {
+                        try {
+                            return {
+                                response: response,
+                                answer: await response.json()
+                            };
+                        } catch (e) {
+                            console.error(e);
+                            throw new Error(`${response.status} ${response.statusText} ${response.url}`);
+                        }
+                    })
+                    .then(data => {
+                        if (data.response.ok) {
+                            return {
+                                status: data.response.status,
+                                answer: data.answer
+                            };
+                        } else {
+                            if (data.answer.errors) {
+                                for (const [key, value] of Object.entries(data.answer.errors)) {
+                                    const input = thisForm.querySelector('input[name=' + key + ']');
+                                    if (input) {
+                                        input.classList.add('is-invalid');
+                                        const feedback = input.parentElement.querySelector('.invalid-feedback');
+                                        if (feedback) {
+                                            feedback.innerText = value;
+                                        }
+                                    }
+                                }
                             }
-                        }));
-                    }
-                })
-                .catch((error) => {
-                    console.error(error);
-                    displayError(error);
-                });
+                            if (data.answer.message) {
+                                throw new Error(`${data.answer.message}`);
+                            } else {
+                                throw new Error(`${data.response.status} ${data.response.statusText} ${data.response.url}`);
+                            }
+                        }
+                    })
+                    .then(data => {
+                        if (data.answer.message) {
+                            displaySuccess(data.answer.message);
+                            return data.answer;
+                        } else if (201 === data.status) {
+                            displaySuccess('Successful');
+                            return data.answer;
+                        } else if (202 === data.status) {
+                            displaySuccess('Successful');
+                            return data.answer;
+                        } else {
+                            throw new Error(data ? data : 'Form submission failed and no error message returned from: ' + action);
+                        }
+                    })
+                    .then(answer => {
+                        if (answer.redirect_to) {
+                            sleep(2000).then(() => {
+                                window.location.href = answer.redirect_to;
+                            });
+                        }
+
+                        const event = thisForm.getAttribute('data-event-success');
+                        if (event) {
+                            document.dispatchEvent(new CustomEvent('submit-form.' + event, {
+                                detail: {
+                                    form: thisForm,
+                                    data: dataForm,
+                                    answer: answer
+                                }
+                            }));
+                        }
+                    })
+                    .catch((error) => {
+                        console.error(error);
+                        displayError(error);
+                    });
             }
         };
     }
@@ -175,10 +189,10 @@
                     grecaptcha.ready(function() {
                         try {
                             grecaptcha.execute(recaptcha, {action: 'submit'})
-                            .then(token => {
-                                form.data.set('recaptcha-response', token);
-                                form.submit();
-                            })
+                                .then(token => {
+                                    form.data.set('recaptcha-response', token);
+                                    form.submit();
+                                })
                         } catch(error) {
                             form.displayError(error);
                         }
