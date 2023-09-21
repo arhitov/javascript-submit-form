@@ -14,6 +14,9 @@ This is JavaScript for sending form data using ajax. The script displays a respo
 ## Requirements
 * bootstrap (5.0+)
 
+## Usage
+See [example][link-example] folder. Also, you can ask me.
+
 ## Sponsor my work!
 If you think this package helped you in any way, you can sponsor me! I am a free developer, so your help will be very helpful to me. :blush:
 
@@ -30,4 +33,4 @@ Welcome here! :metal:
 [link-bootstrap-support]: https://laravel.com/docs/8.x/
 [ico-license]: https://img.shields.io/badge/license-MIT-brightgreen.svg
 [link-license]: LICENSE.md
-[link-example]: Example
+[link-example]: example
