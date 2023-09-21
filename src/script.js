@@ -13,21 +13,21 @@
     // .submit-form-button-submit
     // .submit-form-loading
 
-    function toggle (parentNode, selector) {
+    const toggle = (parentNode, selector) => {
         const element = (selector instanceof Element)
             ? selector
             : parentNode.querySelector(selector);
         return {
             show: element
-                ? function (str = null) {
+                ? (str = null) => {
                     element.classList.remove('d-none');
                     if (str) {
                         element.innerHTML = str;
                     }
                 }
-                : (str) => null,
+                : (str = null) => null,
             hide: element
-                ? function () {
+                ? () => {
                     element.classList.add('d-none');
                 }
                 : () => null,
@@ -40,28 +40,28 @@
         const loading= toggle(thisForm, '.submit-form-loading');
         const message_error = toggle(thisForm, '.submit-form-message-error');
         const message_success= toggle(thisForm, '.submit-form-message-success');
-        const button_submit = (function () {
+        const button_submit = (() => {
             const element = thisForm.querySelector('.submit-form-button-submit');
             return {
                 lock: element
-                    ? function () {
+                    ? () => {
                         element.setAttribute('disabled', 'disabled');
                     }
-                    : (str) => null,
+                    : () => null,
                 unlock: element
-                    ? function () {
+                    ? () => {
                         element.removeAttribute('disabled');
                     }
                     : () => null,
             };
         })();
-        const displayLoading = function () {
+        const displayLoading = () => {
             button_submit.lock();
             loading.show();
             message_error.hide();
             message_success.hide();
         };
-        const displaySuccess = function (success = '') {
+        const displaySuccess = (success = '') => {
             button_submit.unlock();
             loading.hide();
             message_success.show(success);
@@ -70,10 +70,40 @@
                 thisForm.reset();
             }
         };
-        const displayError = function (error) {
+        const displayError = error => {
             button_submit.unlock();
             loading.hide();
             message_error.show(error);
+        };
+
+        const setErrorInput = errors => {
+            for (const [key, value] of Object.entries(errors)) {
+                const input = thisForm.querySelector('input[name=' + key + ']');
+                if (input) {
+                    input.classList.add('is-invalid');
+                    const feedback = input.parentElement.querySelector('.invalid-feedback');
+                    if (feedback) {
+                        feedback.innerText = value;
+                    }
+                    input.addEventListener('input', () => {
+                        clearErrorInput(input);
+                    }, {once: true});
+                }
+            }
+        };
+
+        const clearErrorInput = input => {
+            input.classList.remove('is-invalid');
+            const feedback = input.parentElement.querySelector('.invalid-feedback');
+            if (feedback) {
+                feedback.innerText = '';
+            }
+        };
+
+        const clearErrorInputs = () => {
+            ([].slice.call(document.querySelectorAll('.is-invalid'))).forEach(element => {
+                clearErrorInput(element);
+            });
         };
 
         return {
@@ -84,6 +114,7 @@
             displayError: displayError,
             submit: function () {
                 let action = thisForm.getAttribute('action');
+                clearErrorInputs();
                 fetch(action, {
                     method: 'POST',
                     body: dataForm,
@@ -111,16 +142,7 @@
                             };
                         } else {
                             if (data.answer.errors) {
-                                for (const [key, value] of Object.entries(data.answer.errors)) {
-                                    const input = thisForm.querySelector('input[name=' + key + ']');
-                                    if (input) {
-                                        input.classList.add('is-invalid');
-                                        const feedback = input.parentElement.querySelector('.invalid-feedback');
-                                        if (feedback) {
-                                            feedback.innerText = value;
-                                        }
-                                    }
-                                }
+                                setErrorInput(data.answer.errors);
                             }
                             if (data.answer.message) {
                                 throw new Error(`${data.answer.message}`);
