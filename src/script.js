@@ -1,5 +1,5 @@
 /**
- * Form Submit - v0.2
+ * Form Submit - v0.3
  * URL: https://github.com/arhitov/javascript-submit-form
  * Author: Alexander Arhitov clgsru@gmail.com
  */
@@ -141,9 +141,6 @@
                                 answer: data.answer
                             };
                         } else {
-                            if (data.answer.errors) {
-                                setErrorInput(data.answer.errors);
-                            }
                             if (data.answer.message) {
                                 throw new Error(`${data.answer.message}`);
                             } else {
@@ -152,6 +149,9 @@
                         }
                     })
                     .then(data => {
+                        if (data.answer.errors) {
+                            setErrorInput(data.answer.errors);
+                        }
                         if (data.answer.message) {
                             displaySuccess(data.answer.message);
                             return data.answer;
