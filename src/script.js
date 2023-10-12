@@ -1,5 +1,5 @@
 /**
- * Form Submit - v0.5
+ * Form Submit - v1.0
  * URL: https://github.com/arhitov/javascript-submit-form
  * Author: Alexander Arhitov clgsru@gmail.com
  */
@@ -7,11 +7,13 @@
     "use strict";
 
     // form.submit-form
-    //      [data-reset_form="false"]
-    // .submit-form-message-error
-    // .submit-form-message-success
-    // .submit-form-button-submit
-    // .submit-form-loading
+    //     [data-reset_form="false"]    Do not reset the form after successful completion
+    //     [data-event-success="name"]  Execute the "submit-form.{name}" event on the document object
+
+    const BLOCK_LOADING_SELECTOR = '.submit-form-loading';
+    const BLOCK_SUCCESS_SELECTOR = '.submit-form-message-success';
+    const BLOCK_ERROR_SELECTOR = '.submit-form-message-error';
+    const BUTTON_SUBMIT_SELECTOR = '.submit-form-button-submit';
 
     window.submitFormList = {};
 
@@ -20,250 +22,370 @@
             ? selector
             : parentNode.querySelector(selector);
         return {
-            show: element
-                ? (str = null) => {
-                    element.classList.remove('d-none');
-                    if (str) {
-                        element.innerHTML = str;
-                    }
+            show(str = null) {
+                if (! element) {
+                    return;
                 }
-                : (str = null) => null,
-            hide: element
-                ? () => {
-                    element.classList.add('d-none');
+                element.classList.remove('d-none');
+                if (str) {
+                    element.innerHTML = str;
                 }
-                : () => null,
+            },
+            hide() {
+                element?.classList.add('d-none');
+            },
         };
-    }
+    };
 
-    function initForm (selfForm) {
-        let thisForm = selfForm;
-        let callbackListSuccess = [];
-        let callbackListError = [];
+    const callbackList = () => {
+        let list = [];
+        return {
+            /**
+             * Adding a callback function
+             * @param {function} callback
+             * @return {number}
+             */
+            push(callback) {
+                return list.push(callback);
+            },
+            /**
+             * Execute all added callback functions
+             */
+            run() {
+                list.forEach(callback => {
+                    callback.apply(null, arguments);
+                });
+            },
+        }
+    };
 
-        const loading= toggle(thisForm, '.submit-form-loading');
-        const message_error = toggle(thisForm, '.submit-form-message-error');
-        const message_success= toggle(thisForm, '.submit-form-message-success');
+    function getFormInterface (form) {
+        const callbackListSuccess = callbackList();
+        const callbackListError = callbackList();
+        let answerSuccessful = null;
 
-        const button_submit = (() => {
-            const element = thisForm.querySelector('.submit-form-button-submit');
+        const eventName = form.getAttribute('data-event-success');
+        if (eventName) {
+            callbackListSuccess.push(() => {
+                callEvent('submit-form.' + eventName, {
+                    form: form,
+                    data: formData(),
+                    answer: answerSuccessful
+                });
+            });
+        }
+
+
+        /**
+         * Form name
+         * @return {string}
+         */
+        const formName = () => {
+            return form.getAttribute('name');
+        };
+
+        /**
+         * Form data in FormData format
+         * @return {FormData}
+         */
+        const formData = () => {
+            return new FormData(form);
+        }
+
+        /**
+         * Submitting a form
+         * @return {void}
+         */
+        const formSubmit = () => {
+            form.requestSubmit()
+        }
+
+        const uiEvent = (() => {
+            const loading= toggle(form, BLOCK_LOADING_SELECTOR);
+            const success= toggle(form, BLOCK_SUCCESS_SELECTOR);
+            const error = toggle(form, BLOCK_ERROR_SELECTOR);
+            const buttonSubmit = (() => {
+                const element = select(BUTTON_SUBMIT_SELECTOR, form);
+                return {
+                    lock() {
+                        element?.setAttribute('disabled', 'disabled');
+                    },
+                    unlock() {
+                        element?.removeAttribute('disabled');
+                    },
+                };
+            })();
+
+            const methods = {
+                clear() {
+                    loading.hide();
+                    success.hide();
+                    error.hide();
+                    buttonSubmit.unlock();
+                    return methods;
+                },
+                loading() {
+                    loading.show();
+                    success.hide();
+                    error.hide();
+                    buttonSubmit.lock();
+                    return methods;
+                },
+                success(str) {
+                    loading.hide();
+                    success.show(str);
+
+                    if ('' === (form.getAttribute('data-reset_form') ?? '')) {
+                        form.reset();
+                    }
+                    return methods;
+                },
+                error(str) {
+                    loading.hide();
+                    error.show(str);
+                    return methods;
+                },
+            };
+
+            return methods;
+        })();
+
+        const uiFiled = (() => {
+            const clear = input => {
+                input.classList.remove('is-invalid');
+                const feedback = input.parentElement.querySelector('.invalid-feedback');
+                if (feedback) {
+                    feedback.innerText = '';
+                }
+            };
+
             return {
-                lock: element
-                    ? () => {
-                        element.setAttribute('disabled', 'disabled');
+                clear() {
+                    selectAllForEach('.is-invalid', element => {
+                        clear(element);
+                    });
+                },
+                error(errors) {
+                    for (const [key, value] of Object.entries(errors)) {
+                        const input = select('input[name=' + key + ']', form);
+                        if (input) {
+                            input.classList.add('is-invalid');
+                            const feedback = input.parentElement.querySelector('.invalid-feedback');
+                            if (feedback) {
+                                feedback.innerText = value;
+                            }
+                            input.addEventListener('input', () => {
+                                clear(input);
+                            }, {once: true});
+                        }
                     }
-                    : () => null,
-                unlock: element
-                    ? () => {
-                        element.removeAttribute('disabled');
-                    }
-                    : () => null,
+                },
             };
         })();
-        const displayLoading = () => {
-            button_submit.lock();
-            loading.show();
-            message_error.hide();
-            message_success.hide();
-        };
-        const displaySuccess = (success = '') => {
-            button_submit.unlock();
-            loading.hide();
-            message_success.show(success);
 
-            if ('' === (thisForm.getAttribute('data-reset_form') ?? '')) {
-                thisForm.reset();
-            }
-        };
-        const displayError = error => {
-            button_submit.unlock();
-            loading.hide();
-            message_error.show(error);
-        };
-
-        const setErrorInput = errors => {
-            for (const [key, value] of Object.entries(errors)) {
-                const input = thisForm.querySelector('input[name=' + key + ']');
-                if (input) {
-                    input.classList.add('is-invalid');
-                    const feedback = input.parentElement.querySelector('.invalid-feedback');
-                    if (feedback) {
-                        feedback.innerText = value;
-                    }
-                    input.addEventListener('input', () => {
-                        clearErrorInput(input);
-                    }, {once: true});
+        const fetchSubmit = () => {
+            answerSuccessful = null;
+            let action = form.getAttribute('action');
+            uiFiled.clear();
+            fetch(action, {
+                method: 'POST',
+                body: formData(),
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
-            }
-        };
+            })
+            .then(async response => {
+                try {
+                    return {
+                        response: response,
+                        answer: await response.json()
+                    };
+                } catch (e) {
+                    console.error(e);
+                    throw new Error(`${response.status} ${response.statusText} ${response.url}`);
+                }
+            })
+            .then(data => {
+                if (data.response.ok) {
+                    return {
+                        status: data.response.status,
+                        answer: data.answer
+                    };
+                } else {
+                    if (data.answer.message) {
+                        throw new Error(`${data.answer.message}`);
+                    } else {
+                        throw new Error(`${data.response.status} ${data.response.statusText} ${data.response.url}`);
+                    }
+                }
+            })
+            .then(data => {
+                if (data.answer.errors) {
+                    uiFiled.error(data.answer.errors);
+                }
+                if (data.answer.message) {
+                    uiEvent.clear().success(data.answer.message);
+                    return data.answer;
+                } else if (201 === data.status) {
+                    uiEvent.clear().success('Successful');
+                    return data.answer;
+                } else if (202 === data.status) {
+                    uiEvent.clear().success('Successful');
+                    return data.answer;
+                } else {
+                    throw new Error(data ? data : 'Form submission failed and no error message returned from: ' + action);
+                }
+            })
+            /**
+             * @param {{redirect_to:string}} answer
+             */
+            .then(answer => {
+                if (answer.redirect_to) {
+                    sleep(2000).then(() => {
+                        window.location.href = answer.redirect_to;
+                    });
+                }
+                answerSuccessful = answer;
+                callbackListSuccess.run(answer);
+            })
+            .catch((error) => {
+                console.error(error);
+                uiEvent.clear().error(error);
 
-        const clearErrorInput = input => {
-            input.classList.remove('is-invalid');
-            const feedback = input.parentElement.querySelector('.invalid-feedback');
-            if (feedback) {
-                feedback.innerText = '';
-            }
-        };
-
-        const clearErrorInputs = () => {
-            selectAllForEach('.is-invalid', element => {
-                clearErrorInput(element);
+                callbackListError.run(error);
             });
         };
 
-        const submitForm = {
-            form: thisForm,
-            data() {
-                return new FormData( thisForm )
-            },
-            displayLoading: displayLoading,
-            displaySuccess: displaySuccess,
-            displayError: displayError,
-            callbackSuccess(callback) {
-                return callbackListSuccess.push(callback);
-            },
-            callbackError(callback) {
-                return callbackListError.push(callback);
-            },
-            /**
-             * Hides form lines that have a data-field attribute
-             */
-            fieldHide() {
-                selectAllForEach('[data-field]', element => {
-                    element.classList.add('d-none');
-                }, thisForm);
-            },
-            submit() {
-                let action = thisForm.getAttribute('action');
-                clearErrorInputs();
-                fetch(action, {
-                    method: 'POST',
-                    body: submitForm.data(),
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                .then(async response => {
-                    try {
-                        return {
-                            response: response,
-                            answer: await response.json()
-                        };
-                    } catch (e) {
-                        console.error(e);
-                        throw new Error(`${response.status} ${response.statusText} ${response.url}`);
-                    }
-                })
-                .then(data => {
-                    if (data.response.ok) {
-                        return {
-                            status: data.response.status,
-                            answer: data.answer
-                        };
-                    } else {
-                        if (data.answer.message) {
-                            throw new Error(`${data.answer.message}`);
-                        } else {
-                            throw new Error(`${data.response.status} ${data.response.statusText} ${data.response.url}`);
-                        }
-                    }
-                })
-                .then(data => {
-                    if (data.answer.errors) {
-                        setErrorInput(data.answer.errors);
-                    }
-                    if (data.answer.message) {
-                        displaySuccess(data.answer.message);
-                        return data.answer;
-                    } else if (201 === data.status) {
-                        displaySuccess('Successful');
-                        return data.answer;
-                    } else if (202 === data.status) {
-                        displaySuccess('Successful');
-                        return data.answer;
-                    } else {
-                        throw new Error(data ? data : 'Form submission failed and no error message returned from: ' + action);
-                    }
-                })
-                /**
-                 * @param {{redirect_to:string}} answer
-                 */
-                .then(answer => {
-                    if (answer.redirect_to) {
-                        sleep(2000).then(() => {
-                            window.location.href = answer.redirect_to;
-                        });
-                    }
-
-                    const event = thisForm.getAttribute('data-event-success');
-                    if (event) {
-                        document.dispatchEvent(new CustomEvent('submit-form.' + event, {
-                            detail: {
-                                form: thisForm,
-                                data: submitForm.data(),
-                                answer: answer
-                            }
-                        }));
-                    }
-
-                    callbackListSuccess.forEach(callback => {
-                        callback(answer);
-                    });
-                })
-                .catch((error) => {
-                    console.error(error);
-                    displayError(error);
-
-                    callbackListError.forEach(callback => {
-                        callback(error);
-                    });
-                });
-            }
-        };
-
-        return submitForm;
-    }
-
-    selectAllForEach('form.submit-form', element => {
-        const formName = element.closest('form').getAttribute('name');
-        const form = initForm(element);
-        if (formName) {
-            window.submitFormList[formName] = form;
-        }
         listenerEvent('submit', (data, event) => {
             event.preventDefault();
 
-            let action = form.form.getAttribute('action');
-            let recaptcha = form.form.getAttribute('data-recaptcha-site-key');
+            let action = form.getAttribute('action');
+            let recaptcha = form.getAttribute('data-recaptcha-site-key');
 
             if( ! action ) {
-                form.displayError('The form action property is not set!');
+                uiEvent.clear().error('The form action property is not set!');
                 return;
             }
 
-            form.displayLoading();
+            uiEvent.loading();
 
             if ( recaptcha ) {
-                if(typeof grecaptcha !== "undefined" ) {
+                if(typeof grecaptcha !== 'undefined' ) {
                     grecaptcha.ready(function() {
                         try {
                             grecaptcha.execute(recaptcha, {action: 'submit'})
                                 .then(token => {
-                                    form.data.set('recaptcha-response', token);
-                                    form.submit();
+                                    formData().set('recaptcha-response', token);
+                                    fetchSubmit();
                                 })
                         } catch(error) {
-                            form.displayError(error);
+                            uiEvent.clear().error(error);
                         }
                     });
                 } else {
-                    form.displayError('The reCaptcha javascript API url is not loaded!')
+                    uiEvent.clear().error('The reCaptcha javascript API url is not loaded!')
                 }
             } else {
-                form.submit();
+                fetchSubmit();
             }
-        });
+
+        }, form);
+
+        function FormInterface() {
+
+            /**
+             * Form instance
+             * @return {Element}
+             */
+            this.form = () => {
+                return form;
+            };
+
+            /**
+             * @see formName
+             */
+            this.name = formName;
+
+            /**
+             * @see formData
+             */
+            this.data = formData;
+
+            /**
+             * @see formSubmit
+             */
+            this.submit = formSubmit;
+
+            /**
+             * @see uiEvent.success
+             */
+            this.displaySuccess = uiEvent.success;
+
+            /**
+             * @see uiEvent.error
+             */
+            this.displayError = uiEvent.error;
+
+            /**
+             * Subscription successful response
+             * @param {function} callback
+             * @return {number}
+             */
+            this.callbackSuccess = callback => {
+                return callbackListSuccess.push(callback);
+            };
+
+            /**
+             * Subscription failed response
+             * @param {function} callback
+             * @return {number}
+             */
+            this.callbackError = callback => {
+                return callbackListError.push(callback);
+            };
+
+            /**
+             * Hides form lines that have a data-field attribute
+             */
+            this.fieldHide = () => {
+                selectAllForEach('[data-field]', element => {
+                    element.classList.add('d-none');
+                }, form);
+            };
+
+            /**
+             * Subscribe by clicking on an element to submit the form
+             * @param {Element} element
+             */
+            this.listenerClickForSubmit = element => {
+                listenerEvent('click', () => {
+                    form.requestSubmit();
+                }, element);
+            };
+        }
+
+        return new FormInterface();
+    }
+
+    window.submitForm = {
+        /**
+         * Starting observe for form
+         * @param {Element} form
+         * @return {FormInterface}
+         */
+        observe(form) {
+            const formInterface = getFormInterface(form);
+
+            if (formInterface.name()) {
+                window.submitFormList[formInterface.name()] = formInterface;
+            }
+            return formInterface;
+        },
+    };
+
+    selectAllForEach('form.submit-form', form => {
+        window.submitForm(form);
     });
 
     function sleep(ms) {
