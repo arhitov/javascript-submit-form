@@ -125,6 +125,14 @@
             callbackError(callback) {
                 return callbackListError.push(callback);
             },
+            /**
+             * Hides form lines that have a data-field attribute
+             */
+            fieldHide() {
+                selectAllForEach('[data-field]', element => {
+                    element.classList.add('d-none');
+                }, thisForm);
+            },
             submit() {
                 let action = thisForm.getAttribute('action');
                 clearErrorInputs();
