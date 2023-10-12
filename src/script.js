@@ -1,5 +1,5 @@
 /**
- * Form Submit - v0.3
+ * Form Submit - v0.4
  * URL: https://github.com/arhitov/javascript-submit-form
  * Author: Alexander Arhitov clgsru@gmail.com
  */
@@ -12,6 +12,8 @@
     // .submit-form-message-success
     // .submit-form-button-submit
     // .submit-form-loading
+
+    window.submitFormList = {};
 
     const toggle = (parentNode, selector) => {
         const element = (selector instanceof Element)
@@ -36,10 +38,13 @@
 
     function initForm (selfForm) {
         let thisForm = selfForm;
-        let dataForm= new FormData( thisForm );
+        let callbackListSuccess = [];
+        let callbackListError = [];
+
         const loading= toggle(thisForm, '.submit-form-loading');
         const message_error = toggle(thisForm, '.submit-form-message-error');
         const message_success= toggle(thisForm, '.submit-form-message-success');
+
         const button_submit = (() => {
             const element = thisForm.querySelector('.submit-form-button-submit');
             return {
@@ -101,101 +106,126 @@
         };
 
         const clearErrorInputs = () => {
-            ([].slice.call(document.querySelectorAll('.is-invalid'))).forEach(element => {
+            selectAllForEach('.is-invalid', element => {
                 clearErrorInput(element);
             });
         };
 
-        return {
+        const submitForm = {
             form: thisForm,
-            data: dataForm,
+            data() {
+                return new FormData( thisForm )
+            },
             displayLoading: displayLoading,
             displaySuccess: displaySuccess,
             displayError: displayError,
-            submit: function () {
+            callbackSuccess(callback) {
+                return callbackListSuccess.push(callback);
+            },
+            callbackError(callback) {
+                return callbackListError.push(callback);
+            },
+            submit() {
                 let action = thisForm.getAttribute('action');
                 clearErrorInputs();
                 fetch(action, {
                     method: 'POST',
-                    body: dataForm,
+                    body: submitForm.data(),
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     }
                 })
-                    .then(async response => {
-                        try {
-                            return {
-                                response: response,
-                                answer: await response.json()
-                            };
-                        } catch (e) {
-                            console.error(e);
-                            throw new Error(`${response.status} ${response.statusText} ${response.url}`);
-                        }
-                    })
-                    .then(data => {
-                        if (data.response.ok) {
-                            return {
-                                status: data.response.status,
-                                answer: data.answer
-                            };
-                        } else {
-                            if (data.answer.message) {
-                                throw new Error(`${data.answer.message}`);
-                            } else {
-                                throw new Error(`${data.response.status} ${data.response.statusText} ${data.response.url}`);
-                            }
-                        }
-                    })
-                    .then(data => {
-                        if (data.answer.errors) {
-                            setErrorInput(data.answer.errors);
-                        }
+                .then(async response => {
+                    try {
+                        return {
+                            response: response,
+                            answer: await response.json()
+                        };
+                    } catch (e) {
+                        console.error(e);
+                        throw new Error(`${response.status} ${response.statusText} ${response.url}`);
+                    }
+                })
+                .then(data => {
+                    if (data.response.ok) {
+                        return {
+                            status: data.response.status,
+                            answer: data.answer
+                        };
+                    } else {
                         if (data.answer.message) {
-                            displaySuccess(data.answer.message);
-                            return data.answer;
-                        } else if (201 === data.status) {
-                            displaySuccess('Successful');
-                            return data.answer;
-                        } else if (202 === data.status) {
-                            displaySuccess('Successful');
-                            return data.answer;
+                            throw new Error(`${data.answer.message}`);
                         } else {
-                            throw new Error(data ? data : 'Form submission failed and no error message returned from: ' + action);
+                            throw new Error(`${data.response.status} ${data.response.statusText} ${data.response.url}`);
                         }
-                    })
-                    .then(answer => {
-                        if (answer.redirect_to) {
-                            sleep(2000).then(() => {
-                                window.location.href = answer.redirect_to;
-                            });
-                        }
+                    }
+                })
+                .then(data => {
+                    if (data.answer.errors) {
+                        setErrorInput(data.answer.errors);
+                    }
+                    if (data.answer.message) {
+                        displaySuccess(data.answer.message);
+                        return data.answer;
+                    } else if (201 === data.status) {
+                        displaySuccess('Successful');
+                        return data.answer;
+                    } else if (202 === data.status) {
+                        displaySuccess('Successful');
+                        return data.answer;
+                    } else {
+                        throw new Error(data ? data : 'Form submission failed and no error message returned from: ' + action);
+                    }
+                })
+                /**
+                 * @param {{redirect_to:string}} answer
+                 */
+                .then(answer => {
+                    if (answer.redirect_to) {
+                        sleep(2000).then(() => {
+                            window.location.href = answer.redirect_to;
+                        });
+                    }
 
-                        const event = thisForm.getAttribute('data-event-success');
-                        if (event) {
-                            document.dispatchEvent(new CustomEvent('submit-form.' + event, {
-                                detail: {
-                                    form: thisForm,
-                                    data: dataForm,
-                                    answer: answer
-                                }
-                            }));
-                        }
-                    })
-                    .catch((error) => {
-                        console.error(error);
-                        displayError(error);
+                    const event = thisForm.getAttribute('data-event-success');
+                    if (event) {
+                        document.dispatchEvent(new CustomEvent('submit-form.' + event, {
+                            detail: {
+                                form: thisForm,
+                                data: submitForm.data(),
+                                answer: answer
+                            }
+                        }));
+                    }
+
+                    callbackListSuccess.forEach(callback => {
+                        callback(answer);
                     });
+                })
+                .catch((error) => {
+                    console.error(error);
+                    displayError(error);
+
+                    callbackListError.forEach(callback => {
+                        callback(error);
+                    });
+                });
             }
         };
+
+        return submitForm;
     }
 
-    ([].slice.call(document.querySelectorAll('form.submit-form'))).forEach(element => {
-        element.addEventListener('submit', event => {
+    selectAllForEach('form.submit-form', element => {
+        const formName = element.closest('form').getAttribute('name');
+        const form = initForm(element);
+        if (formName) {
+            window.submitFormList[formName] = form;
+        }
+        listenerEvent('submit', (data, event) => {
             event.preventDefault();
 
-            const form = initForm(element);
             let action = form.form.getAttribute('action');
             let recaptcha = form.form.getAttribute('data-recaptcha-site-key');
 
