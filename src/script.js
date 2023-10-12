@@ -385,7 +385,7 @@
     };
 
     selectAllForEach('form.submit-form', form => {
-        window.submitForm(form);
+        window.submitForm.observe(form);
     });
 
     function sleep(ms) {
