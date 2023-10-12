@@ -1,5 +1,5 @@
 /**
- * Form Submit - v0.4
+ * Form Submit - v0.5
  * URL: https://github.com/arhitov/javascript-submit-form
  * Author: Alexander Arhitov clgsru@gmail.com
  */
